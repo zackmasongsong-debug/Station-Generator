@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Station Assignment Generator</title>
+  <style>
+    /* Default palette (blue) via CSS variables */
+    :root{
+      --bg:#f0f8ff; --card:#fff; --primary:#005bbb; --primary-2:#004799;
+      --muted:#e8f0ff; --muted-2:#d0e0ff; --text:#333; --text-strong:#004799;
+      --tbl-border:#333; --tbl-head:#e0e0e0;
+    }
+
+    /* THEME OVERRIDES */
+    body.theme-blue   { --bg:#f0f8ff; --card:#fff; --primary:#005bbb; --primary-2:#004799; --muted:#e8f0ff; --muted-2:#d0e0ff; --text:#333; --text-strong:#004799; --tbl-border:#333; --tbl-head:#e0e0e0; }
+    body.theme-purple { --bg:#f7f4ff; --card:#fff; --primary:#6b4fd3; --primary-2:#5536c4; --muted:#efeaff; --muted-2:#e0d6ff; --text:#2f2a45; --text-strong:#3b2cb6; --tbl-border:#3b2cb6; --tbl-head:#e7e1ff; }
+    body.theme-grey   { --bg:#f5f5f7; --card:#fff; --primary:#5f6a72; --primary-2:#4a535a; --muted:#eef0f2; --muted-2:#e3e6ea; --text:#2d2f31; --text-strong:#3b4247; --tbl-border:#3b4247; --tbl-head:#eceff1; }
+    body.theme-pink   { --bg:#fff5fa; --card:#fff; --primary:#e55ea2; --primary-2:#cc4c8d; --muted:#ffe4f1; --muted-2:#ffd1e7; --text:#40212e; --text-strong:#b93e7a; --tbl-border:#b93e7a; --tbl-head:#ffe8f3; }
+    body.theme-yellow { --bg:#fffbea; --card:#fff; --primary:#d4a017; --primary-2:#b7850f; --muted:#fff2bf; --muted-2:#ffe68a; --text:#3d3310; --text-strong:#876a0b; --tbl-border:#876a0b; --tbl-head:#fff0c9; }
+
+    body{font-family:Arial,Helvetica,sans-serif;background:var(--bg);margin:0;padding:20px;color:var(--text);}
+    .topbar{max-width:1100px;margin:0 auto 10px;display:flex;justify-content:flex-end;gap:10px;}
+    .page-header{max-width:1100px;margin:0 auto 18px;text-align:center;}
+    .page-header h1{font-size:2em;font-weight:800;color:var(--text-strong);margin:0 0 6px;}
+    .page-header p{font-size:1.05em;margin:6px 0 0;}
+    .logo-wrap{display:flex;justify-content:center;margin-bottom:8px;}
+    .logo-wrap img{max-height:64px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.15);}
+
+    .container{max-width:1100px;margin:10px auto 20px;background:var(--card);padding:20px;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,0.1);}
+    h2{text-align:center;margin-bottom:10px;color:var(--text-strong);}
+    p.desc{text-align:center;margin:8px 0 16px;}
+
+    .segmented{display:inline-flex;border:1px solid var(--primary-2);border-radius:10px;overflow:hidden;margin:6px 0 10px;}
+    .segmented button{padding:8px 14px;border:none;background:var(--muted);color:var(--primary-2);cursor:pointer;font-weight:600;}
+    .segmented button:not(:last-child){border-right:1px solid var(--primary-2);}
+    .segmented button.active{background:var(--primary-2);color:#fff;}
+
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:10px;}
+    textarea{width:100%;height:150px;padding:10px;font-size:1em;border-radius:8px;border:1px solid #ccc;background:#fff;color:#000;resize:vertical;}
+
+    .mode-panel{display:none;}
+    .mode-panel.active{display:block;}
+
+    .button-group{margin-top:18px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+    .divider{color:#aaa;font-weight:bold;padding:0 5px;user-select:none;}
+    button{padding:10px 16px;font-size:1em;border:none;border-radius:6px;cursor:pointer;}
+    .btn-primary{background:var(--primary);color:#fff;}
+    .btn-primary:hover{background:var(--primary-2);}
+    .btn-export,.btn-sort,.btn-ghost{background:var(--muted);color:var(--primary-2);border:1px solid var(--primary-2);}
+    .btn-export:hover,.btn-sort:hover,.btn-ghost:hover{background:var(--muted-2);}
+    .button-group label.chk{display:flex;align-items:center;gap:6px;font-size:0.9em;color:var(--primary-2);border:1px solid var(--primary-2);border-radius:6px;padding:8px 12px;background:var(--muted);cursor:pointer;}
+
+    .results{margin-top:16px;}
+    table{border-collapse:collapse;width:100%;margin-bottom:10px;background:#fff;color:#000;}
+    th,td{border:1px solid var(--tbl-border);padding:8px;text-align:left;}
+    th{background:var(--tbl-head);font-weight:bold;}
+    .timestamp{text-align:right;font-size:0.85em;color:#666;margin-top:5px;}
+
+    dialog.settings, dialog.login{
+      width:760px;max-width:92vw;border:1px solid var(--primary-2);border-radius:12px;padding:0;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,0.25);
+      background:var(--card); color:var(--text);
+    }
+    .settings header, .login header{
+      background:var(--primary-2);color:#fff;padding:14px 16px;font-weight:700;display:flex;justify-content:space-between;align-items:center;
+    }
+    .settings header button, .login header button{
+      background:transparent;border:1px solid #fff;color:#fff;border-radius:8px;padding:6px 10px;cursor:pointer;
+    }
+    .settings .content, .login .content{
+      padding:16px;display:flex;flex-direction:column;gap:12px;
+      max-height:60vh; overflow:auto; /* <-- makes Settings scrollable */
+    }
+    .row{display:flex;gap:10px;align-items:center;}
+    .row label{min-width:230px;font-weight:600;color:var(--primary-2);}
+    .row input[type="text"], .row input[type="password"], .row select{
+      flex:1;padding:10px;border:1px solid #ccc;border-radius:8px;font-size:1em;background:#fff;color:#000;
+    }
+    .row input[type="checkbox"]{transform:scale(1.2);}
+    .settings footer, .login footer{
+      padding:14px 16px;display:flex;justify-content:space-between;gap:10px;background:var(--muted);border-top:1px solid var(--muted-2);
+    }
+    .btn-danger{background:#ffecec;color:#a00000;border:1px solid #a00000;}
+    .btn-danger:hover{background:#ffd9d9;}
+    .note{font-size:0.9em;color:#555;}
+  </style>
+</head><body class="theme-blue">
+<!-- Optional logo -->
+<div class="logo-wrap" id="logoWrap" style="display:none;">
+  <img id="pageLogo" alt="Logo"/>
+</div>
+
+<!-- Page Title -->
+<header class="page-header">
+  <h1 id="pageTitle">Station Assignment Generator</h1>
+  <p id="pageSubtitle">Manage Waithelp and Bushelp pairings with ease</p>
+</header>
+
+<!-- Topbar -->
+<div class="topbar">
+  <button class="btn-ghost" onclick="openSettings()">⚙️ Settings</button>
+  <button class="btn-sort" onclick="clearAllData()">🧽 Clear all data</button>
+</div>
+
+<!-- ===== Generator 1 ===== -->
+<div class="container" id="gen1" data-active-mode="left">
+  <h2 id="gen1Title">🏰 Station Generator 1</h2>
+  <p id="gen1Desc" class="desc">Enter each Cast Member and Station on their own line:</p>
+
+  <div class="segmented">
+    <button id="g1btn-left" class="active" onclick="setMode(1,'left')">Waithelp</button>
+    <button id="g1btn-right" onclick="setMode(1,'right')">Bushelp</button>
+  </div>
+
+  <!-- Waithelp panel -->
+  <div id="panel1-left" class="mode-panel active">
+    <div class="grid">
+      <div>
+        <label for="listA1_left" id="labelA1_left">Cast Member (Waithelp)</label>
+        <textarea id="listA1_left" placeholder="Enter left column values..." oninput="saveModeState(1,'left')"></textarea>
+      </div>
+      <div>
+        <label for="listB1_left" id="labelB1_left">Station (Waithelp)</label>
+        <textarea id="listB1_left" placeholder="Enter right column values..." oninput="saveModeState(1,'left')"></textarea>
+      </div>
+    </div>
+
+    <div class="button-group">
+      <button class="btn-primary" onclick="generatePairsFor(1,'left')">✨ Create a Match</button>
+      <span class="divider">|</span>
+      <button class="btn-sort" id="sort1_left_cast"    onclick="sortResultsFor(1,'left','cast')">↕️ Sort by Left Header</button>
+      <button class="btn-sort" id="sort1_left_station" onclick="sortResultsFor(1,'left','station')">↕️ Sort by Right Header</button>
+      <span class="divider">|</span>
+      <button class="btn-export" onclick="copyResultsWordFor(1,'left')">📄 Copy for Word</button>
+      <button class="btn-export" onclick="copyResultsExcelFor(1,'left')">📊 Copy for Excel</button>
+      <label class="chk"><input type="checkbox" id="excelHeader1_left" onchange="saveModeState(1,'left')"> Include header & timestamp</label>
+    </div>
+
+    <div id="results1_left" class="results"></div>
+  </div>
+
+  <!-- Bushelp panel -->
+  <div id="panel1-right" class="mode-panel">
+    <div class="grid">
+      <div>
+        <label for="listA1_right" id="labelA1_right">Cast Member (Bushelp)</label>
+        <textarea id="listA1_right" placeholder="Enter left column values..." oninput="saveModeState(1,'right')"></textarea>
+      </div>
+      <div>
+        <label for="listB1_right" id="labelB1_right">Station (Bushelp)</label>
+        <textarea id="listB1_right" placeholder="Enter right column values..." oninput="saveModeState(1,'right')"></textarea>
+      </div>
+    </div>
+
+    <div class="button-group">
+      <button class="btn-primary" onclick="generatePairsFor(1,'right')">✨ Create a Match</button>
+      <span class="divider">|</span>
+      <button class="btn-sort" id="sort1_right_cast"    onclick="sortResultsFor(1,'right','cast')">↕️ Sort by Left Header</button>
+      <button class="btn-sort" id="sort1_right_station" onclick="sortResultsFor(1,'right','station')">↕️ Sort by Right Header</button>
+      <span class="divider">|</span>
+      <button class="btn-export" onclick="copyResultsWordFor(1,'right')">📄 Copy for Word</button>
+      <button class="btn-export" onclick="copyResultsExcelFor(1,'right')">📊 Copy for Excel</button>
+      <label class="chk"><input type="checkbox" id="excelHeader1_right" onchange="saveModeState(1,'right')"> Include header & timestamp</label>
+    </div>
+
+    <div id="results1_right" class="results"></div>
+  </div>
+</div>
+
+<!-- ===== Generator 2 ===== -->
+<div class="container" id="gen2" data-active-mode="left">
+  <h2 id="gen2Title">🏰 Station Generator 2</h2>
+  <p id="gen2Desc" class="desc">Enter each Cast Member and Station on their own line:</p>
+
+  <div class="segmented">
+    <button id="g2btn-left" class="active" onclick="setMode(2,'left')">Waithelp</button>
+    <button id="g2btn-right" onclick="setMode(2,'right')">Bushelp</button>
+  </div>
+
+  <!-- Waithelp panel -->
+  <div id="panel2-left" class="mode-panel active">
+    <div class="grid">
+      <div>
+        <label for="listA2_left" id="labelA2_left">Cast Member (Waithelp)</label>
+        <textarea id="listA2_left" placeholder="Enter left column values..." oninput="saveModeState(2,'left')"></textarea>
+      </div>
+      <div>
+        <label for="listB2_left" id="labelB2_left">Station (Waithelp)</label>
+        <textarea id="listB2_left" placeholder="Enter right column values..." oninput="saveModeState(2,'left')"></textarea>
+      </div>
+    </div>
+
+    <div class="button-group">
+      <button class="btn-primary" onclick="generatePairsFor(2,'left')">✨ Create a Match</button>
+      <span class="divider">|</span>
+      <button class="btn-sort" id="sort2_left_cast"    onclick="sortResultsFor(2,'left','cast')">↕️ Sort by Left Header</button>
+      <button class="btn-sort" id="sort2_left_station" onclick="sortResultsFor(2,'left','station')">↕️ Sort by Right Header</button>
+      <span class="divider">|</span>
+      <button class="btn-export" onclick="copyResultsWordFor(2,'left')">📄 Copy for Word</button>
+      <button class="btn-export" onclick="copyResultsExcelFor(2,'left')">📊 Copy for Excel</button>
+      <label class="chk"><input type="checkbox" id="excelHeader2_left" onchange="saveModeState(2,'left')"> Include header & timestamp</label>
+    </div>
+
+    <div id="results2_left" class="results"></div>
+  </div>
+
+  <!-- Bushelp panel -->
+  <div id="panel2-right" class="mode-panel">
+    <div class="grid">
+      <div>
+        <label for="listA2_right" id="labelA2_right">Cast Member (Bushelp)</label>
+        <textarea id="listA2_right" placeholder="Enter left column values..." oninput="saveModeState(2,'right')"></textarea>
+      </div>
+      <div>
+        <label for="listB2_right" id="labelB2_right">Station (Bushelp)</label>
+        <textarea id="listB2_right" placeholder="Enter right column values..." oninput="saveModeState(2,'right')"></textarea>
+      </div>
+    </div>
+
+    <div class="button-group">
+      <button class="btn-primary" onclick="generatePairsFor(2,'right')">✨ Create a Match</button>
+      <span class="divider">|</span>
+      <button class="btn-sort" id="sort2_right_cast"    onclick="sortResultsFor(2,'right','cast')">↕️ Sort by Left Header</button>
+      <button class="btn-sort" id="sort2_right_station" onclick="sortResultsFor(2,'right','station')">↕️ Sort by Right Header</button>
+      <span class="divider">|</span>
+      <button class="btn-export" onclick="copyResultsWordFor(2,'right')">📄 Copy for Word</button>
+      <button class="btn-export" onclick="copyResultsExcelFor(2,'right')">📊 Copy for Excel</button>
+      <label class="chk"><input type="checkbox" id="excelHeader2_right" onchange="saveModeState(2,'right')"> Include header & timestamp</label>
+    </div>
+
+    <div id="results2_right" class="results"></div>
+  </div>
+</div>
+
+<!-- ===== Settings Modal ===== -->
+<dialog id="settingsDialog" class="settings">
+  <header>
+    <span>Settings</span>
+    <button onclick="closeSettings()">✖</button>
+  </header>
+  <div class="content">
+
+    <!-- Theme -->
+    <div class="row">
+      <label for="cfgTheme">Theme</label>
+      <select id="cfgTheme">
+        <option value="blue">Light Blue</option>
+        <option value="purple">Light Purple</option>
+        <option value="grey">Grey</option>
+        <option value="pink">Light Pink</option>
+        <option value="yellow">Light Yellow</option>
+      </select>
+    </div>
+
+    <!-- Logo settings -->
+    <section style="border:1px solid var(--muted-2); border-radius:10px; padding:12px;">
+      <h3 style="margin:0 0 10px; color:var(--primary-2);">Logo</h3>
+      <div class="row">
+        <label for="cfgLogoShow">Show logo</label>
+        <input type="checkbox" id="cfgLogoShow"/>
+      </div>
+      <div class="row">
+        <label for="cfgLogoUrl">Logo URL</label>
+        <input type="text" id="cfgLogoUrl" placeholder="https://example.com/logo.png"/>
+      </div>
+      <div class="row">
+        <label for="cfgLogoFile">Upload logo (PNG/JPG/SVG)</label>
+        <input type="file" id="cfgLogoFile" accept="image/*" />
+      </div>
+      <div class="note">Upload stores the image locally (as a data URL). URL also supported.</div>
+    </section>
+
+    <!-- === Custom Texts (grouped) === -->
+    <section style="border:1px solid var(--muted-2); border-radius:10px; padding:12px;">
+      <h3 style="margin:0 0 10px; color:var(--primary-2);">Custom Texts</h3>
+
+      <div class="row">
+        <label for="cfgTitle">Page title</label>
+        <input type="text" id="cfgTitle" placeholder="Station Assignment Generator"/>
+      </div>
+
+      <div class="row">
+        <label for="cfgSubtitle">Subtitle</label>
+        <input type="text" id="cfgSubtitle" placeholder="Manage Waithelp and Bushelp pairings with ease"/>
+      </div>
+
+      <hr/>
+
+      <div class="row">
+        <label for="cfgGen1Title">Generator 1 title</label>
+        <input type="text" id="cfgGen1Title" placeholder="🏰 Station Generator 1"/>
+      </div>
+
+      <div class="row">
+        <label for="cfgGen1Desc">Generator 1 description</label>
+        <input type="text" id="cfgGen1Desc" placeholder="Enter each Cast Member and Station on their own line:"/>
+      </div>
+
+      <div class="row">
+        <label for="cfgGen2Title">Generator 2 title</label>
+        <input type="text" id="cfgGen2Title" placeholder="🏰 Station Generator 2"/>
+      </div>
+
+      <div class="row">
+        <label for="cfgGen2Desc">Generator 2 description</label>
+        <input type="text" id="cfgGen2Desc" placeholder="Enter each Cast Member and Station on their own line:"/>
+      </div>
+
+      <hr/>
+
+      <div class="row">
+        <label for="cfgHeaderLeft">Default left column header</label>
+        <input type="text" id="cfgHeaderLeft" placeholder="Cast Member"/>
+      </div>
+
+      <div class="row">
+        <label for="cfgHeaderRight">Default right column header</label>
+        <input type="text" id="cfgHeaderRight" placeholder="Station"/>
+      </div>
+    </section>
+
+    <hr/>
+    <div class="row"><label>Admin username</label><input type="text" value="Admin" disabled/></div>
+    <div class="row"><label for="curPwd">Current password</label><input type="password" id="curPwd" placeholder="Current password"/></div>
+    <div class="row"><label for="newPwd">New password</label><input type="password" id="newPwd" placeholder="New password"/></div>
+    <div class="row"><label for="newPwd2">Confirm new password</label><input type="password" id="newPwd2" placeholder="Confirm new password"/></div>
+  </div>
+  <footer>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <button class="btn-danger" onclick="resetTexts()">Reset text defaults</button>
+      <button class="btn-danger" onclick="resetAllSettings()">Reset ALL (includes password)</button>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <button class="btn-export" onclick="saveSettings()">Save</button>
+      <button class="btn-export" onclick="changePassword()">Change password</button>
+      <button class="btn-primary" onclick="lockSettings()">🔒 Lock now</button>
+    </div>
+  </footer>
+</dialog>
+
+<!-- ===== Login Modal ===== -->
+<dialog id="loginDialog" class="login">
+  <header>
+    <span>Admin Login</span>
+    <button onclick="closeLogin()">✖</button>
+  </header>
+  <div class="content">
+    <div class="row"><label for="loginUser">Username</label><input id="loginUser" type="text" value="Admin" disabled/></div>
+    <div class="row"><label for="loginPwd">Password</label><input id="loginPwd" type="password" placeholder="Enter password"/></div>
+  </div>
+  <footer>
+    <span></span>
+    <div>
+      <button class="btn-export" onclick="closeLogin()">Cancel</button>
+      <button class="btn-export" onclick="attemptLogin()">Login</button>
+    </div>
+  </footer>
+</dialog>
+<script>
+  /* ==============================
+     GLOBAL VARS & HELPERS
+     ============================== */
+  const APP_PREFIX = "StationGen_";
+  let SETTINGS_AUTH = false;
+  function K(key){ return APP_PREFIX+key; }
+  
+  /* ====== Robust hashing (SHA-256 with FNV-1a fallback) ====== */
+  function fnv1aHex(str){
+    let h = 0x811c9dc5 >>> 0;
+    for (let i=0;i<str.length;i++){
+      h ^= str.charCodeAt(i);
+      h = (h + (h<<1) + (h<<4) + (h<<7) + (h<<8) + (h<<24)) >>> 0; // *16777619
+    }
+    return h.toString(16).padStart(8,"0");
+  }
+  async function sha256Hex(str){
+    const buf = new TextEncoder().encode(str);
+    const digest = await crypto.subtle.digest("SHA-256", buf);
+    return Array.from(new Uint8Array(digest)).map(b=>b.toString(16).padStart(2,"0")).join("");
+  }
+  function preferredAlg(){ return (window.crypto && crypto.subtle) ? "sha256" : "fnv1a"; }
+  function inferAlgFromHash(h){ return (h && h.length === 64) ? "sha256" : "fnv1a"; }
+  async function computeHash(str, alg){
+    if (alg === "sha256" && window.crypto && crypto.subtle) return await sha256Hex(str);
+    return fnv1aHex(str);
+  }
+  async function ensurePassword(){
+    if (!localStorage.getItem(K("pwdHash"))) {
+      const alg = preferredAlg();
+      const h = await computeHash("admin", alg);
+      localStorage.setItem(K("pwdHash"), h);
+      localStorage.setItem(K("pwdAlg"), alg);
+    }
+  }
+  
+  /* Headers + theme + logo helpers */
+  function getHeaderText(side){
+    const left  = localStorage.getItem(K("cfgHeaderLeft"))  || "Cast Member";
+    const right = localStorage.getItem(K("cfgHeaderRight")) || "Station";
+    return side==="left" ? left : right;
+  }
+  function applyTheme(){
+    const t = localStorage.getItem(K("cfgTheme")) || "blue";
+    const b = document.body;
+    b.classList.remove("theme-blue","theme-purple","theme-grey","theme-pink","theme-yellow");
+    b.classList.add("theme-"+t);
+  }
+  function applyLogo(){
+    const show = (localStorage.getItem(K("cfgLogoShow"))||"0")==="1";
+    const url  = localStorage.getItem(K("cfgLogoUrl")) || "";
+    const wrap = document.getElementById("logoWrap");
+    const img  = document.getElementById("pageLogo");
+    if(show && url){
+      img.src = url;
+      wrap.style.display = "";
+    }else{
+      wrap.style.display = "none";
+      img.removeAttribute("src");
+    }
+  }
+  function handleLogoUpload(file){
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e){
+      const dataUrl = e.target.result;        // data:image/...;base64,xxxx
+      localStorage.setItem(K("cfgLogoUrl"), dataUrl);
+      localStorage.setItem(K("cfgLogoShow"), "1");
+      const urlInput = document.getElementById("cfgLogoUrl");
+      const showCb   = document.getElementById("cfgLogoShow");
+      if (urlInput) urlInput.value = dataUrl;
+      if (showCb) showCb.checked = true;
+      applyLogo();
+    };
+    reader.readAsDataURL(file);
+  }
+  function updateSortButtonLabels(){
+    const HL = getHeaderText("left");
+    const HR = getHeaderText("right");
+    const ids = [
+      "sort1_left_cast","sort1_left_station","sort1_right_cast","sort1_right_station",
+      "sort2_left_cast","sort2_left_station","sort2_right_cast","sort2_right_station"
+    ];
+    ids.forEach(id=>{
+      const el = document.getElementById(id);
+      if(!el) return;
+      if(id.includes("_cast"))    el.textContent = "↕️ Sort by " + HL;
+      if(id.includes("_station")) el.textContent = "↕️ Sort by " + HR;
+    });
+  }
+  function refreshVisibleTableHeaders(){
+    const HL = getHeaderText("left"), HR = getHeaderText("right");
+    document.querySelectorAll(".results table thead tr").forEach(tr=>{
+      if(tr.cells[0]) tr.cells[0].textContent = HL;
+      if(tr.cells[1]) tr.cells[1].textContent = HR;
+    });
+  }
+  
+  /* Update UI texts and labels */
+  function applyPageTexts(){
+    document.getElementById("pageTitle").textContent =
+      localStorage.getItem(K("cfgTitle")) || "Station Assignment Generator";
+    document.getElementById("pageSubtitle").textContent =
+      localStorage.getItem(K("cfgSubtitle")) || "Manage Waithelp and Bushelp pairings with ease";
+  
+    // Generator titles & descriptions
+    document.getElementById("gen1Title").textContent =
+      localStorage.getItem(K("cfgGen1Title")) || "🏰 Station Generator 1";
+    document.getElementById("gen2Title").textContent =
+      localStorage.getItem(K("cfgGen2Title")) || "🏰 Station Generator 2";
+    document.getElementById("gen1Desc").textContent =
+      localStorage.getItem(K("cfgGen1Desc")) || "Enter each Cast Member and Station on their own line:";
+    document.getElementById("gen2Desc").textContent =
+      localStorage.getItem(K("cfgGen2Desc")) || "Enter each Cast Member and Station on their own line:";
+  
+    // Field labels
+    document.getElementById("labelA1_left").textContent  = getHeaderText("left")+" (Waithelp)";
+    document.getElementById("labelB1_left").textContent  = getHeaderText("right")+" (Waithelp)";
+    document.getElementById("labelA1_right").textContent = getHeaderText("left")+" (Bushelp)";
+    document.getElementById("labelB1_right").textContent = getHeaderText("right")+" (Bushelp)";
+    document.getElementById("labelA2_left").textContent  = getHeaderText("left")+" (Waithelp)";
+    document.getElementById("labelB2_left").textContent  = getHeaderText("right")+" (Waithelp)";
+    document.getElementById("labelA2_right").textContent = getHeaderText("left")+" (Bushelp)";
+    document.getElementById("labelB2_right").textContent = getHeaderText("right")+" (Bushelp)";
+  
+    updateSortButtonLabels();
+    refreshVisibleTableHeaders();
+  }
+  
+  /* Shuffle */
+  function shuffle(array){
+    for (let i = array.length - 1; i > 0; i--){
+      const j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
+    }
+  }
+  
+  /* ==============================
+     GENERATOR LOGIC (with leftovers)
+     ============================== */
+  function generatePairsFor(gen,mode){
+    const listA = document.getElementById("listA"+gen+"_"+mode).value.trim().split("\n").map(s=>s.trim()).filter(Boolean);
+    const listB = document.getElementById("listB"+gen+"_"+mode).value.trim().split("\n").map(s=>s.trim()).filter(Boolean);
+    const resultsDiv = document.getElementById("results"+gen+"_"+mode);
+    resultsDiv.innerHTML = "";
+  
+    if(listA.length===0 || listB.length===0){
+      resultsDiv.textContent="Please fill out both lists.";
+      return;
+    }
+  
+    shuffle(listA); shuffle(listB);
+    const n = Math.min(listA.length, listB.length);
+  
+    const HL = getHeaderText("left"), HR = getHeaderText("right");
+    let table = "<table><thead><tr><th>"+HL+"</th><th>"+HR+"</th></tr></thead><tbody>";
+    const pairs = [];
+    for(let i=0;i<n;i++){
+      pairs.push([listA[i], listB[i]]);
+      table += "<tr><td>"+listA[i]+"</td><td>"+listB[i]+"</td></tr>";
+    }
+    table += "</tbody></table>";
+  
+    const ts = new Date().toLocaleString();
+  
+    // Leftovers
+    const leftoverA = listA.slice(n);
+    const leftoverB = listB.slice(n);
+    let leftoverHtml = "";
+    if (leftoverA.length > 0) {
+      leftoverHtml += "<div><strong>Unmatched "+HL+"(s):</strong> " + leftoverA.join(", ") + "</div>";
+    }
+    if (leftoverB.length > 0) {
+      leftoverHtml += "<div><strong>Unmatched "+HR+"(s):</strong> " + leftoverB.join(", ") + "</div>";
+    }
+  
+    resultsDiv.innerHTML = table
+      + '<div class="timestamp">🕒 Generated on: '+ts+'</div>'
+      + leftoverHtml;
+  
+    // copy buffers
+    resultsDiv.dataset.rawExcel = pairs.map(p=>p.join("\t")).join("\n");
+    resultsDiv.dataset.rawWord  = table + '<p><em>Generated on: '+ts+'</em></p>' + leftoverHtml;
+  }
+  
+  /* Sort + refresh buffers */
+  function sortResultsFor(gen,mode,by){
+    const resultsDiv = document.getElementById("results"+gen+"_"+mode);
+    const table = resultsDiv.querySelector("table");
+    if(!table){ alert("⚠️ Generate results first."); return; }
+    const idx = by==="cast" ? 0 : 1;
+    const rows = Array.from(table.querySelectorAll("tbody tr"));
+    rows.sort((a,b)=> a.cells[idx].textContent.trim().localeCompare(b.cells[idx].textContent.trim(), undefined, {numeric:true,sensitivity:"base"}));
+    rows.forEach(r=>table.querySelector("tbody").appendChild(r));
+  
+    // refresh copy buffers
+    const HL = getHeaderText("left"), HR = getHeaderText("right");
+    const pairs = Array.from(table.querySelectorAll("tbody tr")).map(tr=>[tr.cells[0].textContent.trim(), tr.cells[1].textContent.trim()]);
+    resultsDiv.dataset.rawExcel = pairs.map(p=>p.join("\t")).join("\n");
+    let newTable = "<table><thead><tr><th>"+HL+"</th><th>"+HR+"</th></tr></thead><tbody>";
+    newTable += pairs.map(p=>"<tr><td>"+p[0]+"</td><td>"+p[1]+"</td></tr>").join("");
+    newTable += "</tbody></table>";
+    const stamp  = resultsDiv.querySelector(".timestamp");
+    const stampHtml = stamp ? '<p>'+stamp.textContent+'</p>' : "";
+    resultsDiv.dataset.rawWord = newTable + stampHtml;
+  }
+  
+  /* Copy to Excel (TSV) */
+  function copyResultsExcelFor(gen,mode){
+    const res = document.getElementById("results"+gen+"_"+mode);
+    let raw = res.dataset.rawExcel || "";
+    if(!raw){ alert("⚠️ No results to copy."); return; }
+    if(document.getElementById("excelHeader"+gen+"_"+mode).checked){
+      raw = getHeaderText("left")+"\t"+getHeaderText("right")+"\n" + raw + "\n\nGenerated on:\t"+new Date().toLocaleString();
+    }
+    navigator.clipboard.writeText(raw).then(()=> alert("✅ Results copied for Excel."));
+  }
+  
+  /* Copy to Word (HTML table selection to preserve borders) */
+  function copyResultsWordFor(gen,mode){
+    const res = document.getElementById("results"+gen+"_"+mode);
+    const html = res.dataset.rawWord || "";
+    if(!html){ alert("⚠️ No results to copy."); return; }
+    const temp = document.createElement("div");
+    temp.innerHTML = html;
+    document.body.appendChild(temp);
+    const range = document.createRange();
+    range.selectNode(temp);
+    const sel = window.getSelection();
+    sel.removeAllRanges(); sel.addRange(range);
+    try{ document.execCommand("copy"); sel.removeAllRanges(); alert("✅ Full table copied for Word. Paste to keep the grid."); }
+    catch(e){ alert("⚠️ Copy failed. Please try again."); }
+    document.body.removeChild(temp);
+  }
+  
+  /* ==============================
+     MODE / STATE
+     ============================== */
+  function setMode(gen,mode){
+    document.getElementById("gen"+gen).dataset.activeMode = mode;
+    document.getElementById("panel"+gen+"-left").classList.toggle("active", mode==="left");
+    document.getElementById("panel"+gen+"-right").classList.toggle("active", mode==="right");
+    document.getElementById("g"+gen+"btn-left").classList.toggle("active", mode==="left");
+    document.getElementById("g"+gen+"btn-right").classList.toggle("active", mode==="right");
+  }
+  function saveModeState(gen,mode){
+    localStorage.setItem(K("listA"+gen+"_"+mode), document.getElementById("listA"+gen+"_"+mode).value);
+    localStorage.setItem(K("listB"+gen+"_"+mode), document.getElementById("listB"+gen+"_"+mode).value);
+    localStorage.setItem(K("excelHeader"+gen+"_"+mode), document.getElementById("excelHeader"+gen+"_"+mode).checked?"1":"0");
+  }
+  
+  /* ==============================
+     SETTINGS I/O
+     ============================== */
+  function restoreSettingsIntoUI(){
+    // Theme
+    document.getElementById("cfgTheme").value       = localStorage.getItem(K("cfgTheme"))    || "blue";
+  
+    // Logo
+    document.getElementById("cfgLogoShow").checked  = (localStorage.getItem(K("cfgLogoShow"))||"0")==="1";
+    document.getElementById("cfgLogoUrl").value     = localStorage.getItem(K("cfgLogoUrl"))  || "";
+    const f = document.getElementById("cfgLogoFile");
+    if (f) f.value = "";
+  
+    // Custom Texts
+    document.getElementById("cfgTitle").value       = localStorage.getItem(K("cfgTitle"))    || "Station Assignment Generator";
+    document.getElementById("cfgSubtitle").value    = localStorage.getItem(K("cfgSubtitle")) || "Manage Waithelp and Bushelp pairings with ease";
+    document.getElementById("cfgGen1Title").value   = localStorage.getItem(K("cfgGen1Title")) || "🏰 Station Generator 1";
+    document.getElementById("cfgGen1Desc").value    = localStorage.getItem(K("cfgGen1Desc"))  || "Enter each Cast Member and Station on their own line:";
+    document.getElementById("cfgGen2Title").value   = localStorage.getItem(K("cfgGen2Title")) || "🏰 Station Generator 2";
+    document.getElementById("cfgGen2Desc").value    = localStorage.getItem(K("cfgGen2Desc"))  || "Enter each Cast Member and Station on their own line:";
+    document.getElementById("cfgHeaderLeft").value  = localStorage.getItem(K("cfgHeaderLeft"))  || "Cast Member";
+    document.getElementById("cfgHeaderRight").value = localStorage.getItem(K("cfgHeaderRight")) || "Station";
+  }
+  
+  /* ==============================
+     SETTINGS (open/save/reset)
+     ============================== */
+  function openSettings(){
+    if(!SETTINGS_AUTH){ document.getElementById("loginPwd").value=""; document.getElementById("loginDialog").showModal(); return; }
+    restoreSettingsIntoUI();
+    document.getElementById("settingsDialog").showModal();
+  }
+  function closeSettings(){
+  document.getElementById("settingsDialog").close();
+  SETTINGS_AUTH = false; // auto-lock on close
+}
+  function closeLogin(){ document.getElementById("loginDialog").close(); }
+  function lockSettings(){
+  SETTINGS_AUTH = false;
+  try { closeSettings(); } catch(e){}
+  alert("🔒 Settings locked. You’ll need the password next time.");
+}
+  function saveSettings(){
+    // Theme
+    localStorage.setItem(K("cfgTheme"), document.getElementById("cfgTheme").value || "blue");
+  
+    // Logo
+    localStorage.setItem(K("cfgLogoShow"), document.getElementById("cfgLogoShow").checked ? "1" : "0");
+    localStorage.setItem(K("cfgLogoUrl"),  (document.getElementById("cfgLogoUrl").value||"").trim());
+  
+    // Custom Texts
+    localStorage.setItem(K("cfgTitle"),        (document.getElementById("cfgTitle").value||"").trim()        || "Station Assignment Generator");
+    localStorage.setItem(K("cfgSubtitle"),     (document.getElementById("cfgSubtitle").value||"").trim()     || "Manage Waithelp and Bushelp pairings with ease");
+    localStorage.setItem(K("cfgGen1Title"),    (document.getElementById("cfgGen1Title").value||"").trim()    || "🏰 Station Generator 1");
+    localStorage.setItem(K("cfgGen1Desc"),     (document.getElementById("cfgGen1Desc").value||"").trim()     || "Enter each Cast Member and Station on their own line:");
+    localStorage.setItem(K("cfgGen2Title"),    (document.getElementById("cfgGen2Title").value||"").trim()    || "🏰 Station Generator 2");
+    localStorage.setItem(K("cfgGen2Desc"),     (document.getElementById("cfgGen2Desc").value||"").trim()     || "Enter each Cast Member and Station on their own line:");
+    localStorage.setItem(K("cfgHeaderLeft"),   (document.getElementById("cfgHeaderLeft").value||"").trim()   || "Cast Member");
+    localStorage.setItem(K("cfgHeaderRight"),  (document.getElementById("cfgHeaderRight").value||"").trim()  || "Station");
+  
+    applyTheme();
+    applyLogo();
+    applyPageTexts();
+    alert("✅ Settings saved.");
+  }
+  
+  function resetTexts(){
+    [
+      "cfgTitle","cfgSubtitle","cfgHeaderLeft","cfgHeaderRight",
+      "cfgGen1Title","cfgGen2Title","cfgGen1Desc","cfgGen2Desc"
+    ].forEach(k => localStorage.removeItem(K(k)));
+    applyPageTexts();
+    alert("Texts restored to defaults.");
+  }
+  
+  function resetAllSettings(){
+    if(!confirm("Reset ALL settings (including password)?")) return;
+    localStorage.clear();
+    alert("All settings cleared.");
+    location.reload();
+  }
+  
+  /* ===== Password + login using robust hashing ===== */
+  async function attemptLogin(){
+    const pwd = document.getElementById("loginPwd").value;
+    const stored = localStorage.getItem(K("pwdHash")) || "";
+    let alg = localStorage.getItem(K("pwdAlg")) || inferAlgFromHash(stored);
+    const input = await computeHash(pwd, alg);
+    if (input !== stored){ alert("Invalid password."); return; }
+    SETTINGS_AUTH = true;
+    closeLogin(); openSettings();
+  }
+  async function changePassword(){
+    const cur=document.getElementById("curPwd").value.trim();
+    const n1=document.getElementById("newPwd").value.trim();
+    const n2=document.getElementById("newPwd2").value.trim();
+    if(!cur || !n1 || !n2){ alert("Fill all password fields."); return; }
+    if(n1!==n2){ alert("New passwords do not match."); return; }
+  
+    const stored = localStorage.getItem(K("pwdHash")) || "";
+    let algStored = localStorage.getItem(K("pwdAlg")) || inferAlgFromHash(stored);
+    const curHash = await computeHash(cur, algStored);
+    if(curHash !== stored){ alert("Current password is incorrect."); return; }
+  
+    const algNew = preferredAlg();
+    const newHash = await computeHash(n1, algNew);
+    localStorage.setItem(K("pwdHash"), newHash);
+    localStorage.setItem(K("pwdAlg"), algNew);
+    document.getElementById("curPwd").value = document.getElementById("newPwd").value = document.getElementById("newPwd2").value = "";
+    alert("✅ Password updated.");
+  }
+  
+  /* Clear only generator data (keep settings/password) */
+  function clearAllData(){
+    ["1_left","1_right","2_left","2_right"].forEach(s=>{
+      localStorage.removeItem(K("listA"+s));
+      localStorage.removeItem(K("listB"+s));
+      localStorage.removeItem(K("excelHeader"+s));
+      const r = document.getElementById("results"+s);
+      if (r){ r.innerHTML=""; r.dataset.rawExcel=""; r.dataset.rawWord=""; }
+      const taA = document.getElementById("listA"+s); if (taA) taA.value="";
+      const taB = document.getElementById("listB"+s); if (taB) taB.value="";
+      const cb  = document.getElementById("excelHeader"+s); if (cb) cb.checked=false;
+    });
+    alert("🧽 Lists & results cleared. Settings preserved.");
+  }
+    
+  /* ==============================
+     INIT
+     ============================== */
+  (async function init(){
+    await ensurePassword();
+  
+    // Wire file upload (Logo)
+    var f = document.getElementById("cfgLogoFile");
+    if (f) {
+      f.addEventListener("change", function(e){
+        const file = e.target.files && e.target.files[0];
+        handleLogoUpload(file);
+        setTimeout(()=>{ e.target.value=""; }, 0); // clear picker
+      });
+    }
+  
+    applyTheme();
+    applyLogo();
+    applyPageTexts();
+    ["1_left","1_right","2_left","2_right"].forEach(s=>{
+      const cb = document.getElementById("excelHeader"+s);
+      if (cb) cb.checked = localStorage.getItem(K("excelHeader"+s))==="1";
+    });
+    setMode(1,"left"); setMode(2,"left");
+  })();
+  </script>
+  </body>
+  </html>
+  
